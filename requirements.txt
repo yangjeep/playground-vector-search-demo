@@ -1,0 +1,4 @@
+boto3==1.26.115
+firexapp==4.9.70
+firexkit==4.7.49
+pandas==2.0.0
