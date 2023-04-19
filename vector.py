@@ -11,30 +11,28 @@ from firexkit.chain import InjectArgs
 from dotenv import load_dotenv
 import os
 import csv
+import pandas as pd
 
 
-def read_tsv_to_dict(prod_file_path):
+def read_tsv_to_dataframe(prod_file_path):
     """
     open tsv file and read it into a list of dictionaries
     """
-    data = []
+    dataframe = pd.read_csv(prod_file_path, sep='\t', encoding='utf-8')
 
-    with open(prod_file_path, newline='', encoding='utf-8') as file:
-        reader = csv.DictReader(file, delimiter='\t')
-        for row in reader:
-            data.append(row)
+    print(dataframe.columns)
 
-    return data
+    return dataframe
 
 
-@app.task(bind=True, returns=['prod_info_raw'])
+@app.task(bind=True, returns=['prod_info_rawdf'])
 def import_prod_data(self, prod_file_path):
     '''
     Import product data based on file name
     '''
-    raw = read_tsv_to_dict(prod_file_path)
+    rawdf = read_tsv_to_dataframe(prod_file_path)
 
-    return raw
+    return rawdf
 
 
 @InputConverter.register
@@ -70,8 +68,8 @@ def prep_data(self, feed):
     print("Prep data")
     results = self.enqueue_child_and_get_results(
         import_prod_data.s(feed))
-    print(results['prod_info_raw'])
-    return results['prod_info_raw']
+    print(results['prod_info_rawdf'])
+    return results['prod_info_rawdf']
 
 
 @InputConverter.register
