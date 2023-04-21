@@ -8,6 +8,7 @@ from firexapp.engine.celery import app
 from firexapp.submit.arguments import InputConverter
 from firexkit.chain import InjectArgs
 
+
 from dotenv import load_dotenv
 import os
 import csv
@@ -18,11 +19,21 @@ def read_tsv_to_dataframe(prod_file_path):
     """
     open tsv file and read it into a list of dictionaries
     """
-    dataframe = pd.read_csv(prod_file_path, sep='\t', encoding='utf-8')
+    # Define the chunk size
+    chunk_size = 1000
 
-    print(dataframe.columns)
+    # Create an empty DataFrame to store the combined data
+    combined_data = pd.DataFrame()
 
-    return dataframe
+    # Read JSON file in chunks
+    for chunk in pd.read_json(prod_file_path, lines=True, chunksize=chunk_size):
+        # Combine the chunks into a single DataFrame
+        combined_data = pd.concat([combined_data, chunk])
+
+    # Display the first few rows of the DataFrame
+    print(combined_data.head())
+
+    return combined_data
 
 
 @app.task(bind=True, returns=['prod_info_rawdf'])
@@ -47,7 +58,7 @@ def indexing(self):
     """
     Indexing the data by preping the data then use openai api to tokenize/encode the embeddings
     """
-    encoding_chain = prep_data.s(feed="products.txt") | embedding_encode.s(
+    encoding_chain = prep_data.s(feed="records.json") | embedding_encode.s(
         prodlist='@prod_info_list')
     self.enqueue_child_and_get_results(encoding_chain)
 
@@ -68,7 +79,7 @@ def prep_data(self, feed):
     print("Prep data")
     results = self.enqueue_child_and_get_results(
         import_prod_data.s(feed))
-    print(results['prod_info_rawdf'])
+    print(len(results['prod_info_rawdf']))
     return results['prod_info_rawdf']
 
 

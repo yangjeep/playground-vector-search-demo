@@ -24,12 +24,13 @@ def read_env_file():
     return openai_api_key
 
 
-@app.task()
-def embedding_encode():
+@app.task(bind=True, returns=['embeddings'])
+def embedding_encode(self, encode_string):
     openai.api_key = read_env_file()
-    
+
     openai.Engine.list()  # check we have authenticated
 
-    embedding = openai.Embedding.create(
-        input="product name", model="text-embedding-ada-002")["data"][0]["embedding"]
-    print(embedding)
+    embeddings = openai.Embedding.create(
+        input=encode_string, model="text-embedding-ada-002")["data"][0]["embedding"]
+    print(embeddings)
+    return embeddings
