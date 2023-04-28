@@ -17,20 +17,21 @@ def read_env_file():
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
     if openai_api_key:
-        print(f"OPENAI_API_KEY: {openai_api_key}")
+        print(f"OPENAI_API_KEY is imported")
     else:
         print("OPENAI_API_KEY not found in .env file")
+
+    openai.list_engines()
 
     return openai_api_key
 
 
-@app.task(bind=True, returns=['embeddings'])
-def embedding_encode(self, encode_string):
-    openai.api_key = read_env_file()
+def embedding_encode(encode_string):
+    # always stringify the input
+    encode_string = str(encode_string)
 
-    openai.Engine.list()  # check we have authenticated
+    print(f"encoding string: {encode_string}")
 
     embeddings = openai.Embedding.create(
         input=encode_string, model="text-embedding-ada-002")["data"][0]["embedding"]
-    print(embeddings)
     return embeddings
