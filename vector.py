@@ -16,6 +16,14 @@ import pandas as pd
 import openai
 import openai_embedding
 
+from sklearn.manifold import TSNE
+import numpy as np
+
+import matplotlib.pyplot as plt
+import matplotlib
+import numpy as np
+import ast
+
 
 def read_json_to_dataframe(prod_file_path):
     """
@@ -67,14 +75,16 @@ def prep_data(self, feed):
     return results['prod_info_rawdf']
 
 
-@app.task(bind=True, returns=['indexing_result'])
+@app.task(bind=True, returns=['indexed_df'])
 def indexing(self):
     """ 
     check if the data has been indexed, if not then index it
     """
     if os.path.exists('vsearch_index.jsonl'):
         print("Indexing already done!")
-        return True
+        df = self.enqueue_child_and_get_results(import_prod_data.s(
+            prod_file_path='vsearch_index.jsonl'))
+        return df['prod_info_rawdf']
 
     """
     Indexing the data by preping the data then use openai api to tokenize/encode the embeddings
@@ -86,7 +96,7 @@ def indexing(self):
     with open('output_file.jsonl', 'w') as file:
         indexed['results'].to_json(file, orient='records', lines=True)
 
-    return True
+    return indexed['results']
 
 
 @app.task(bind=True, returns=['results'])
@@ -140,12 +150,33 @@ def search_gpt(self, search):
 
 
 @ app.task(bind=True)
-def loadDB(self):
+def loadDB(self, df):
     return True
 
 
 @ app.task(bind=True)
-def visualize_search(self):
+def visualize_search(self, search, df):
+    print(df.head())
+
+    matrix = np.array(df.embedding.apply(ast.literal_eval).to_list())
+
+    print(matrix)
+    tsne = TSNE(n_components=2, perplexity=15, random_state=42,
+                init='random', learning_rate=200)
+    vis_dims = tsne.fit_transform(matrix)
+    vis_dims.shape
+
+    colors = ["turquoise"]
+    x = [x for x, y in vis_dims]
+    y = [y for x, y in vis_dims]
+
+    color_indices = 0
+
+    colormap = matplotlib.colors.ListedColormap(colors)
+    plt.scatter(x, y, c=color_indices, cmap=colormap, alpha=0.3)
+
+    plt.title("Try plot")
+
     return True
 
 
@@ -166,6 +197,6 @@ def vsearch(self, search):
         if not self.enqueue_child_and_get_results(visualize_search.s()):
             return False
     """
-    chain = indexing.s() | loadDB.s() | search_gpt.s(
-        search='@search') | visualize_search.s(search='@search')
+    # chain = indexing.s() | loadDB.s(df='@indexed_df') | search_gpt.s(search='@search') | visualize_search.s(search='@search', df='@indexed_df')
+    chain = indexing.s() | visualize_search.s(search='@search', df='@indexed_df')
     self.enqueue_child_and_get_results(chain)

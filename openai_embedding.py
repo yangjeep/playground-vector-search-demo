@@ -21,7 +21,13 @@ def read_env_file():
     else:
         print("OPENAI_API_KEY not found in .env file")
 
-    openai.list_engines()
+    openai.api_key = openai_api_key
+
+    try:
+        openai.Model.list()
+        print("OpenAI API key is valid")
+    except:
+        print("OpenAI API key is invalid")
 
     return openai_api_key
 
