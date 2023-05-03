@@ -75,30 +75,6 @@ def prep_data(self, feed):
     return results['prod_info_rawdf']
 
 
-@app.task(bind=True, returns=['indexed_df'])
-def indexing(self):
-    """ 
-    check if the data has been indexed, if not then index it
-    """
-    if os.path.exists('vsearch_index.jsonl'):
-        print("Indexing already done!")
-        df = self.enqueue_child_and_get_results(import_prod_data.s(
-            prod_file_path='vsearch_index.jsonl'))
-        return df['prod_info_rawdf']
-
-    """
-    Indexing the data by preping the data then use openai api to tokenize/encode the embeddings
-    """
-    encoding_chain = prep_data.s(feed="records.json") | embedding_encode.s(
-        prodlist='@prod_info_list')
-    indexed = self.enqueue_child_and_get_results(encoding_chain)
-
-    with open('output_file.jsonl', 'w') as file:
-        indexed['results'].to_json(file, orient='records', lines=True)
-
-    return indexed['results']
-
-
 @app.task(bind=True, returns=['results'])
 def embedding_encode(self, prodlist):
     """
@@ -124,79 +100,25 @@ def embedding_encode(self, prodlist):
     return df
 
 
-def main():
+@app.task(bind=True, returns=['indexed_df'])
+def indexing(self):
+    """ 
+    check if the data has been indexed, if not then index it
     """
-    Main entry point for the vector search
-    """
-    df = read_json_to_dataframe("records.json")
-    print(df['title'].astype(str))
-
-
-@ InputConverter.register
-@ SingleArgDecorator('search')
-def preprocess_searchterm(search):
-    """
-    Just a stub
-    """
-    return search
-
-
-@ app.task(bind=True, returns=['results'])
-def search_gpt(self, search):
-    """
-    Search the data
-    """
-    return "Search the data"
-
-
-@ app.task(bind=True)
-def loadDB(self, df):
-    return True
-
-
-@ app.task(bind=True)
-def visualize_search(self, search, df):
-    print(df.head())
-
-    matrix = np.array(df.embedding.apply(ast.literal_eval).to_list())
-
-    print(matrix)
-    tsne = TSNE(n_components=2, perplexity=15, random_state=42,
-                init='random', learning_rate=200)
-    vis_dims = tsne.fit_transform(matrix)
-    vis_dims.shape
-
-    colors = ["turquoise"]
-    x = [x for x, y in vis_dims]
-    y = [y for x, y in vis_dims]
-
-    color_indices = 0
-
-    colormap = matplotlib.colors.ListedColormap(colors)
-    plt.scatter(x, y, c=color_indices, cmap=colormap, alpha=0.3)
-
-    plt.title("Try plot")
-
-    return True
-
-
-@ app.task(bind=True)
-def vsearch(self, search):
-    """
-    Entry point for vector search
-    """
-    print("Search for:"+search)
+    if os.path.exists('vsearch_index.jsonl'):
+        print("Indexing already done!")
+        df = self.enqueue_child_and_get_results(import_prod_data.s(
+            prod_file_path='vsearch_index.jsonl'))
+        return df['prod_info_rawdf']
 
     """
-        if not self.enqueue_child_and_get_results(indexing.s()):
-            return False
-        if not self.enqueue_child_and_get_results(loadDB.s()):
-            return False
-        if not self.enqueue_child_and_get_results(search_gpt.s(search)):
-            return False
-        if not self.enqueue_child_and_get_results(visualize_search.s()):
-            return False
+    Indexing the data by preping the data then use openai api to tokenize/encode the embeddings
     """
-    # chain = indexing.s() | loadDB.s(df='@indexed_df') | search_gpt.s(search='@search') | visualize_search.s(search='@search', df='@indexed_df')
-    chain = indexing.s() | visualize_search.s(search='@search', df='@indexed_df')
-    self.enqueue_child_and_get_results(chain)
+    encoding_chain = prep_data.s(feed="records.json") | embedding_encode.s(
+        prodlist='@prod_info_list')
+    indexed = self.enqueue_child_and_get_results(encoding_chain)
+
+    with open('output_file.jsonl', 'w') as file:
+        indexed['results'].to_json(file, orient='records', lines=True)
+
+    return indexed['results']
