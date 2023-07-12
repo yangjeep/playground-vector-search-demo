@@ -72,6 +72,8 @@ def plot_data(df, s, labels=None):
         plt.text(embeddings_2d[idx, 0], embeddings_2d[idx, 1], titles_list[idx], fontsize=8)
         print(titles_list[idx])
 
+    plt.text(embeddings_2d[-1, 0], embeddings_2d[-1, 1], "search", fontsize=10, color='red')
+
 
     plt.show()
     # plt.savefig("demo-vsearch.png", dpi=300)
