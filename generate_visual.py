@@ -4,7 +4,6 @@ import pandas as pd
 
 from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
 
 import openai
