@@ -1,28 +1,17 @@
 
-from getpass import getuser
-from operator import truediv
 from firexkit.argument_conversion import SingleArgDecorator
-from firexkit.task import FireXTask
 
 from firexapp.engine.celery import app
 from firexapp.submit.arguments import InputConverter
-from firexkit.chain import InjectArgs
 
 
-from dotenv import load_dotenv
 import os
-import csv
 import pandas as pd
 import openai
 import openai_embedding
 
-from sklearn.manifold import TSNE
-import numpy as np
 
-import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
-import ast
 
 
 def read_json_to_dataframe(prod_file_path):
@@ -76,7 +65,7 @@ def prep_data(self, feed):
 
 
 @app.task(bind=True, returns=['results'])
-def embedding_encode(self, prodlist):
+def embedding_gpt(self, prodlist):
     """
     Encode the embeddings using openai api: only tokenize the product name!
     """
@@ -88,15 +77,10 @@ def embedding_encode(self, prodlist):
     # df['embedding'] = encoded_titles
     combined_fields = df.apply(lambda row: str(
         row['title']) + str(row['body_html']), axis=1)
-    df['embedding'] = combined_fields.apply(openai_embedding.embedding_encode)
+    df['embedding_gpt'] = combined_fields.apply(openai_embedding.embedding_encode)
 
-    print(df['embedding'].head())
+    print(df['embedding_gpt'].head())
 
-    with open('vsearch_index.jsonl', 'w') as file:
-        df.to_json(file, orient='records', lines=True)
-    # get the embedding for the title
-
-    # create a new field called 'embedding' and store embedding into it
     return df
 
 
@@ -105,7 +89,7 @@ def indexing(self):
     """ 
     check if the data has been indexed, if not then index it
     """
-    if os.path.exists('vsearch_index.jsonl'):
+    if os.path.exists('artifact/output_file.jsonl'):
         print("Indexing already done!")
         df = self.enqueue_child_and_get_results(import_prod_data.s(
             prod_file_path='vsearch_index.jsonl'))
@@ -114,11 +98,11 @@ def indexing(self):
     """
     Indexing the data by preping the data then use openai api to tokenize/encode the embeddings
     """
-    encoding_chain = prep_data.s(feed="records.json") | embedding_encode.s(
+    encoding_chain = prep_data.s(feed="records.json") | embedding_gpt.s(
         prodlist='@prod_info_list')
     indexed = self.enqueue_child_and_get_results(encoding_chain)
 
-    with open('output_file.jsonl', 'w') as file:
+    with open('artifact/output_file.jsonl', 'w') as file:
         indexed['results'].to_json(file, orient='records', lines=True)
 
     return indexed['results']

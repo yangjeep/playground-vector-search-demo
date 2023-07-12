@@ -7,7 +7,10 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 
+import openai
+
 import openai_embedding
+from scipy.spatial import distance
 
 
 def read_jsonl_to_df(jsonl_path):
@@ -31,10 +34,13 @@ def read_jsonl_to_df(jsonl_path):
     return combined_data
 
 
-def plot_data(df):
+def plot_data(df, s, labels=None):
     embeddings_list = df["embedding_gpt"].tolist()
+    titles_list = df["title"].tolist()  # assuming "title" is the name of the column with titles
 
+    # Append the search term embedding to the list
     embeddings = np.array(embeddings_list)
+    embeddings = np.append(embeddings, [s], axis=0)
 
     # Initialize t-SNE algorithm
     tsne = TSNE(n_components=2, random_state=42)
@@ -42,16 +48,41 @@ def plot_data(df):
     # Fit and transform the embeddings to a 2D space
     embeddings_2d = tsne.fit_transform(embeddings)
 
-    # Plot the t-SNE results
-    plt.scatter(embeddings_2d[:, 0], embeddings_2d[:, 1])
+    # Create a scatter plot
+    scatter = plt.scatter(embeddings_2d[:-1, 0], embeddings_2d[:-1, 1], c=labels)
+
+    # Add the search term to the plot
+    plt.scatter(embeddings_2d[-1, 0], embeddings_2d[-1, 1], c='red')
+
+    # If labels provided, add a colorbar
+    if labels is not None:
+        plt.colorbar(scatter)
+
     plt.xlabel("t-SNE Component 1")
     plt.ylabel("t-SNE Component 2")
     plt.title("t-SNE Visualization of GPT Text Embeddings")
 
-    plt.savefig("demo-vsearch.png", dpi=300)
+    # Compute the distances from the search term to all other points
+    dists = distance.cdist([embeddings_2d[-1]], embeddings_2d[:-1], 'euclidean')[0]
+    
+    # Get the indices of the five closest points
+    closest_idxs = dists.argsort()[:5]
+    
+    # Print the titles of the five closest points on the plot
+    for idx in closest_idxs:
+        plt.text(embeddings_2d[idx, 0], embeddings_2d[idx, 1], titles_list[idx], fontsize=8)
+        print(titles_list[idx])
+
+
+    plt.show()
+    # plt.savefig("demo-vsearch.png", dpi=300)
+
+
 
 
 def main():
+    openai.api_key = openai_embedding.read_env_file()
+
     prod_file_path = "artifact/output_file.jsonl"
     df = read_jsonl_to_df(prod_file_path)
 
@@ -63,7 +94,7 @@ def main():
             break
 
         # Get the embedding for the search term
-        s = openai_embedding.get_embedding(search_term)
+        s = openai_embedding.embedding_encode(search_term)
 
         # Plot the data
         plot_data(df, s)
