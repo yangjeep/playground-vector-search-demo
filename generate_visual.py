@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 
+import openai_embedding
+
 
 def read_jsonl_to_df(jsonl_path):
     """
@@ -30,7 +32,7 @@ def read_jsonl_to_df(jsonl_path):
 
 
 def plot_data(df):
-    embeddings_list = df["embedding"].tolist()
+    embeddings_list = df["embedding_gpt"].tolist()
 
     embeddings = np.array(embeddings_list)
 
@@ -50,11 +52,21 @@ def plot_data(df):
 
 
 def main():
-    prod_file_path = "test.jsonl"
+    prod_file_path = "artifact/output_file.jsonl"
     df = read_jsonl_to_df(prod_file_path)
 
-    plot_data(df)
 
+    while True:
+        # Prompt the user for a search term
+        search_term = input("Enter a search term (or 'q' to quit): ")
+        if search_term.lower() == 'q':
+            break
+
+        # Get the embedding for the search term
+        s = openai_embedding.get_embedding(search_term)
+
+        # Plot the data
+        plot_data(df, s)
 
 if __name__ == "__main__":
     main()
